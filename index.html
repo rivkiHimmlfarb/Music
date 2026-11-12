@@ -1,0 +1,2458 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>נגן מוזיקה וניהול רשימות השמעה</title>
+
+    <!-- Favicon מוטמע (SVG בנתיב data) - תואם למותג הנגן -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%230f172a'/%3E%3Cstop offset='100%25' stop-color='%231e3a8a'/%3E%3C/linearGradient%3E%3ClinearGradient id='gold' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23fde047'/%3E%3Cstop offset='50%25' stop-color='%23f59e0b'/%3E%3Cstop offset='100%25' stop-color='%23b45309'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23bg)' stroke='%23f59e0b' stroke-width='2' stroke-opacity='0.4'/%3E%3Cpath d='M25 43V21l21-5v22' fill='none' stroke='url(%23gold)' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='20' cy='43' r='5.5' fill='url(%23gold)'/%3E%3Ccircle cx='41' cy='38' r='5.5' fill='url(%23gold)'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2338bdf8'/%3E%3Cpath d='M26 44V20l16-4v24' fill='none' stroke='%23ffffff' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='21' cy='44' r='5' fill='%23ffffff'/%3E%3Ccircle cx='37' cy='40' r='5' fill='%23ffffff'/%3E%3C/svg%3E">
+
+    <!-- ייבוא נתונים (מוסתר, מופעל מהתפריט) -->
+    <input type="file" id="importInput" accept="application/json,.json" class="hidden">
+
+    <!-- טעינת גופנים בעברית: Heebo ו-Assistant -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&family=Heebo:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- טעינת Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Heebo', 'Assistant', 'sans-serif'],
+                    },
+                    colors: {
+                        studio: {
+                            950: '#090b10',
+                            900: '#0f131a',
+                            850: '#151b24',
+                            800: '#1c2430',
+                            700: '#283344',
+                            accent: '#38bdf8',
+                            gold: '#f59e0b',
+                            emerald: '#10b981'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* עיצוב מותאם לפסי גלילה ואפקטים של זכוכית */
+        body {
+            background-color: #090b10;
+            color: #f1f5f9;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(21, 27, 36, 0.72);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-player {
+            background: rgba(15, 19, 26, 0.88);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* סרגל גלילה מעודן */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 19, 26, 0.4);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.25);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.45);
+        }
+
+        /* עיצוב סליידרים מותאם אישית */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 9999px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #38bdf8;
+            margin-top: -4px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+            transition: transform 0.15s ease;
+        }
+        input[type="range"]:hover::-webkit-slider-thumb {
+            transform: scale(1.25);
+        }
+
+        /* אנימציית גלים גיאומטרית עדינה */
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.04); }
+        }
+        .animate-glow {
+            animation: pulseGlow 4s infinite ease-in-out;
+        }
+
+        /* כותרת טבלה קפואה (Sticky Header) */
+        #tableHeaderRow {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: rgba(15, 19, 26, 0.96);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+
+        /* עמודות לחיצות למיון */
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.15s ease;
+        }
+        .sortable:hover {
+            color: #e2e8f0;
+        }
+        .sortable .sort-arrow {
+            display: inline-block;
+            font-size: 9px;
+            opacity: 0.35;
+            vertical-align: middle;
+            margin-inline-start: 4px;
+        }
+        .sortable.active {
+            color: #38bdf8;
+        }
+        .sortable.active .sort-arrow {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden antialiased selection:bg-sky-500 selection:text-white">
+
+    <!-- שכבת גרירת קבצים (Drag & Drop Overlay) -->
+    <div id="dropOverlay" class="fixed inset-0 z-50 bg-studio-950/90 backdrop-blur-md hidden flex-col items-center justify-center border-2 border-dashed border-sky-400 m-4 rounded-3xl transition-all">
+        <div class="w-20 h-20 rounded-2xl bg-sky-500/20 flex items-center justify-center mb-4 text-sky-400">
+            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+        </div>
+        <h2 class="text-2xl font-bold text-white mb-2">שחררו כאן להוספת קטעי שמע</h2>
+        <p class="text-slate-400 text-sm">תומך בקבצי MP3, WAV, OGG, M4A</p>
+    </div>
+
+    <!-- אזור מרכזי: תפריט צד + תוכן ראשי -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- כפתור פתיחת תפריט במובייל -->
+        <div id="mobileBackdrop" onclick="toggleSidebar(false)" class="fixed inset-0 bg-black/60 z-30 hidden md:hidden backdrop-blur-sm"></div>
+
+        <!-- סרגל צד (Sidebar) -->
+        <aside id="sidebar" class="fixed md:static inset-y-0 right-0 z-40 w-72 glass-panel border-l border-white/10 flex flex-col transition-transform duration-300 translate-x-full md:translate-x-0">
+            <!-- לוגו וכותרת -->
+            <div class="p-6 flex items-center justify-between border-b border-white/5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg tracking-tight text-white">אולפן נגינה</h1>
+                        <p class="text-xs text-slate-400">ניהול והשמעת ניגונים</p>
+                    </div>
+                </div>
+                <button onclick="toggleSidebar(false)" class="md:hidden p-2 text-slate-400 hover:text-white rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- כפתור העלאת קבצים -->
+            <div class="p-4">
+                <label class="flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-gradient-to-l from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-semibold shadow-lg shadow-sky-500/20 cursor-pointer transition-all active:scale-95">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span>העלאת קבצי שמע</span>
+                    <input type="file" id="fileInput" multiple accept="audio/*" class="hidden">
+                </label>
+            </div>
+
+            <!-- ניווט ראשי -->
+            <div class="px-3 space-y-1">
+                <div class="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">ספרייה</div>
+                
+                <button onclick="selectView('all')" id="nav-all" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors bg-sky-500/15 text-sky-400">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                        <span>כל השירים</span>
+                    </div>
+                    <span id="count-all" class="text-xs px-2 py-0.5 rounded-full bg-white/10 text-slate-300">0</span>
+                </button>
+
+                <button onclick="selectView('favorites')" id="nav-favorites" class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-white/5 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                        <span>מועדפים</span>
+                    </div>
+                    <span id="count-favorites" class="text-xs px-2 py-0.5 rounded-full bg-white/10 text-slate-300">0</span>
+                </button>
+            </div>
+
+            <!-- רשימות השמעה מותאמות אישית -->
+            <div class="mt-6 px-3 flex-1 flex flex-col overflow-hidden">
+                <div class="px-3 py-1.5 flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">רשימות השמעה</span>
+                    <button onclick="openPlaylistModal()" title="רשימת השמעה חדשה" class="p-1 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-white/10 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                </div>
+
+                <div id="playlistsNavContainer" class="mt-1 space-y-1 overflow-y-auto flex-1 pr-1">
+                    <!-- רשימות ההשמעה יוזרקו לכאן דינמית -->
+                </div>
+                <p id="storageInfo" class="px-3 pt-2 text-[10px] text-slate-500">הנתונים יישמרו אוטומטית</p>
+            </div>
+
+            <!-- הערת קבצים חסרים לאחר שחזור/ייבוא -->
+            <div id="missingFilesNotice" class="hidden mx-4 mb-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] leading-relaxed text-amber-300"></div>
+
+            <!-- ויזואלייזר צדדי מובנה -->
+            <div class="p-4 border-t border-white/5 bg-studio-950/40">
+                <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+                    <span>מנתח תדרים חי</span>
+                    <span id="visualizerStatus" class="text-emerald-400 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> מוכן
+                    </span>
+                </div>
+                <canvas id="visualizerCanvas" class="w-full h-14 rounded-xl bg-studio-900/80 border border-white/5"></canvas>
+            </div>
+        </aside>
+
+        <!-- אזור תוכן ראשי -->
+        <main class="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-studio-900 via-studio-950 to-studio-950">
+            
+            <!-- סרגל עליון: חיפוש, כפתור תפריט מובייל, סטטיסטיקות -->
+            <header class="p-4 md:px-8 md:py-5 border-b border-white/5 flex flex-wrap items-center justify-between gap-4 bg-studio-900/40 backdrop-blur-md">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleSidebar(true)" class="md:hidden p-2.5 rounded-xl bg-white/5 text-slate-200 hover:bg-white/10">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    </button>
+                    
+                    <!-- שדה חיפוש (עם איפוס אוטומטי וכפתור ניקוי) -->
+                    <div class="relative w-64 sm:w-80">
+                        <input type="text" id="searchInput" oninput="onSearchInput()" placeholder="חיפוש לפי שם ניגון או יוצר..."
+                            class="w-full bg-studio-850/90 border border-white/10 rounded-xl py-2.5 pr-10 pl-10 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-sky-500 transition-colors">
+                        <svg class="w-4 h-4 text-slate-400 absolute right-3.5 top-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <button id="clearSearchBtn" onclick="clearSearch()" title="ניקוי החיפוש" class="hidden absolute left-2 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- פעולות מהירות בראש העמוד -->
+                <div class="flex items-center gap-2.5">
+                    <button onclick="playCurrentListShuffled()" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium text-slate-200 transition-all">
+                        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        <span>הפעל בערבוב</span>
+                    </button>
+
+                    <!-- ייצוא נתונים -->
+                    <button onclick="exportData()" title="ייצוא הספרייה והרשימות לקובץ JSON" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium text-slate-200 transition-all">
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <span>ייצוא</span>
+                    </button>
+
+                    <!-- ייבוא נתונים -->
+                    <button onclick="document.getElementById('importInput').click()" title="ייבוא נתונים מקובץ JSON" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium text-slate-200 transition-all">
+                        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                        <span>ייבוא</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- כותרת התצוגה הנוכחית (Banner) -->
+            <div class="px-6 md:px-8 pt-6 pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <!-- אייקון גיאומטרי מופשט לתצוגה -->
+                    <div id="viewIconBox" class="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-tr from-sky-500/20 via-indigo-500/20 to-emerald-500/20 border border-white/10 flex items-center justify-center shadow-inner relative overflow-hidden">
+                        <div class="absolute inset-0 bg-sky-400/10 animate-glow"></div>
+                        <svg class="w-9 h-9 text-sky-400 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span id="viewBadge" class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/20">ספרייה ראשית</span>
+                        </div>
+                        <h2 id="viewTitle" class="text-2xl md:text-3xl font-extrabold text-white mt-1">כל השירים</h2>
+                        <p id="viewSubtitle" class="text-sm text-slate-400 mt-0.5">0 קטעים • משך כולל 00:00</p>
+                    </div>
+                </div>
+
+                <!-- כפתורי ניהול רשימת השמעה (מוצגים רק בתצוגת רשימה מותאמת) -->
+                <div id="playlistActions" class="hidden items-center gap-2">
+                    <button onclick="openRenamePlaylistModal()" class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition-colors">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <span>שינוי שם</span>
+                    </button>
+                    <button onclick="deleteCurrentPlaylist()" class="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-xs font-medium text-rose-400 flex items-center gap-1.5 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        <span>מחק רשימה</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- רשימת השירים (טבלה / כרטיסיות רספונסיביות) -->
+            <div class="flex-1 overflow-y-auto px-4 md:px-8 pb-32">
+                <div class="glass-panel rounded-2xl">
+                    <!-- כותרות עמודות (בדסקטופ) - קפואות בזמן גלילה, לחיצות למיון -->
+                    <div id="tableHeaderRow" class="hidden sm:grid grid-cols-12 gap-4 px-5 py-3 border-b border-white/5 text-xs font-semibold text-slate-400 uppercase tracking-wider rounded-t-2xl">
+                        <div class="col-span-1 text-center">#</div>
+                        <div class="col-span-4 sortable" data-sort="title" onclick="toggleSort('title')" title="מיון לפי שם הניגון">שם הניגון<span class="sort-arrow">↕</span></div>
+                        <div class="col-span-3 sortable" data-sort="artist" onclick="toggleSort('artist')" title="מיון לפי יוצר / מקור">יוצר / מקור<span class="sort-arrow">↕</span></div>
+                        <div class="col-span-1 text-center sortable" data-sort="duration" onclick="toggleSort('duration')" title="מיון לפי משך">משך<span class="sort-arrow">↕</span></div>
+                        <div class="col-span-3 text-left">פעולות</div>
+                    </div>
+
+                    <!-- סרגל מיון למובייל -->
+                    <div class="sm:hidden flex items-center gap-2 px-4 py-2 border-b border-white/5 text-xs">
+                        <span class="text-slate-400">מיון:</span>
+                        <button data-sort="title" onclick="toggleSort('title')" class="sort-badge px-2.5 py-1 rounded-lg bg-white/5 text-slate-300">שם</button>
+                        <button data-sort="artist" onclick="toggleSort('artist')" class="sort-badge px-2.5 py-1 rounded-lg bg-white/5 text-slate-300">יוצר</button>
+                        <button data-sort="duration" onclick="toggleSort('duration')" class="sort-badge px-2.5 py-1 rounded-lg bg-white/5 text-slate-300">משך</button>
+                    </div>
+
+                    <!-- גוף הרשימה -->
+                    <div id="tracksContainer" class="divide-y divide-white/5">
+                        <!-- השירים יוזרקו לכאן -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- נגן תחתון קבוע (Persistent Bottom Player Bar) -->
+    <footer class="glass-player fixed bottom-0 inset-x-0 z-40 px-4 md:px-8 py-3">
+        <div class="max-w-screen-2xl mx-auto flex flex-col gap-2">
+            
+            <!-- פס התקדמות (Seek Bar) -->
+            <div class="flex items-center gap-3 w-full">
+                <span id="currentTimeDisplay" class="text-xs font-mono text-slate-400 w-10 text-left">00:00</span>
+                <div class="relative flex-1 flex items-center">
+                    <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1" class="w-full z-10">
+                    <div class="absolute inset-x-0 h-1.5 bg-white/10 rounded-full overflow-hidden pointer-events-none">
+                        <div id="seekProgressFill" class="h-full bg-gradient-to-l from-sky-400 to-indigo-500 w-0 transition-all duration-75"></div>
+                    </div>
+                </div>
+                <span id="totalDurationDisplay" class="text-xs font-mono text-slate-400 w-10 text-right">00:00</span>
+            </div>
+
+            <!-- שורת פקדים ראשית -->
+            <div class="flex items-center justify-between gap-4">
+                
+                <!-- צד ימין: פרטי הניגון המתנגן כעת -->
+                <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                    <div id="playerArt" class="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500/30 to-indigo-600/30 border border-white/10 flex items-center justify-center shrink-0 relative overflow-hidden">
+                        <svg class="w-6 h-6 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h3 id="nowPlayingTitle" class="text-sm font-bold text-white truncate">בחרו ניגון להשמעה</h3>
+                            <button id="nowPlayingFavBtn" onclick="toggleCurrentTrackFavorite()" class="text-slate-400 hover:text-amber-400 transition-colors hidden" title="הוסף למועדפים">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                            </button>
+                        </div>
+                        <p id="nowPlayingArtist" class="text-xs text-slate-400 truncate">אולפן נגינה • מוכן</p>
+                    </div>
+                </div>
+
+                <!-- מרכז: כפתורי שליטה בהשמעה (שים לב לכיווניות RTL: הבא משמאל, הקודם מימין) -->
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <!-- ערבוב שירים (Shuffle) -->
+                    <button id="shuffleBtn" onclick="toggleShuffle()" title="ערבוב שירים חכם" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all relative">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        <span id="shuffleDot" class="hidden w-1.5 h-1.5 rounded-full bg-sky-400 absolute bottom-1 left-1/2 -translate-x-1/2"></span>
+                    </button>
+
+                    <!-- הרצועה הקודמת (חץ ימינה ב-RTL) -->
+                    <button onclick="prevTrack()" title="הקודם" class="p-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 transition-colors">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" transform="scale(-1, 1) translate(-24, 0)"/>
+                        </svg>
+                    </button>
+
+                    <!-- נגן / השהה -->
+                    <button id="playPauseBtn" onclick="togglePlayPause()" title="נגן / השהה (רווח)" class="w-12 h-12 rounded-full bg-sky-500 hover:bg-sky-400 text-studio-950 flex items-center justify-center shadow-lg shadow-sky-500/30 transition-all active:scale-95">
+                        <svg id="playIcon" class="w-6 h-6 translate-x-[-1px]" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        <svg id="pauseIcon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                        </svg>
+                    </button>
+
+                    <!-- הרצועה הבאה (חץ שמאלה ב-RTL) -->
+                    <button onclick="nextTrack()" title="הבא" class="p-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 transition-colors">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" transform="scale(-1, 1) translate(-24, 0)"/>
+                        </svg>
+                    </button>
+
+                    <!-- מצב חזרה (Repeat: Off -> All -> One) -->
+                    <button id="repeatBtn" onclick="cycleRepeatMode()" title="חזרה: כבוי" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-all relative">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        <span id="repeatOneBadge" class="hidden text-[9px] font-bold bg-sky-500 text-studio-950 rounded-full w-3.5 h-3.5 flex items-center justify-center absolute -top-0.5 -right-0.5">1</span>
+                    </button>
+                </div>
+
+                <!-- צד שמאל: מהירות השמעה, טיימר כיבוי ועוצמת שמע -->
+                <div class="hidden lg:flex items-center justify-end gap-3 flex-1">
+                    
+                    <!-- מהירות השמעה -->
+                    <button id="speedBtn" onclick="cyclePlaybackSpeed()" title="מהירות השמעה" class="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono font-semibold text-slate-300 transition-colors">
+                        1x
+                    </button>
+
+                    <!-- טיימר כיבוי (Sleep Timer) -->
+                    <div class="relative">
+                        <button id="sleepTimerBtn" onclick="toggleSleepMenu()" title="טיימר כיבוי" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 transition-colors">
+                            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                            </svg>
+                            <span id="sleepTimerLabel">טיימר</span>
+                        </button>
+
+                        <!-- תפריט בחירת טיימר -->
+                        <div id="sleepMenu" class="hidden absolute bottom-12 left-0 w-44 glass-panel rounded-xl shadow-2xl border border-white/10 p-1.5 z-50">
+                            <div class="text-[11px] font-semibold text-slate-400 px-2.5 py-1">כיבוי אוטומטי בעוד:</div>
+                            <button onclick="setSleepTimer(0)" class="w-full text-right px-2.5 py-1.5 text-xs rounded-lg hover:bg-white/10 text-slate-200">כבוי</button>
+                            <button onclick="setSleepTimer(15)" class="w-full text-right px-2.5 py-1.5 text-xs rounded-lg hover:bg-white/10 text-slate-200">15 דקות</button>
+                            <button onclick="setSleepTimer(30)" class="w-full text-right px-2.5 py-1.5 text-xs rounded-lg hover:bg-white/10 text-slate-200">30 דקות</button>
+                            <button onclick="setSleepTimer(45)" class="w-full text-right px-2.5 py-1.5 text-xs rounded-lg hover:bg-white/10 text-slate-200">45 דקות</button>
+                            <button onclick="setSleepTimer(60)" class="w-full text-right px-2.5 py-1.5 text-xs rounded-lg hover:bg-white/10 text-slate-200">60 דקות</button>
+                        </div>
+                    </div>
+
+                    <!-- עוצמת שמע (Volume) -->
+                    <div class="flex items-center gap-2 w-32">
+                        <button id="muteBtn" onclick="toggleMute()" title="השתק / בטל השתקה" class="text-slate-300 hover:text-white transition-colors">
+                            <svg id="volHighIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                            </svg>
+                            <svg id="volMuteIcon" class="w-5 h-5 hidden text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+                            </svg>
+                        </button>
+                        <div class="relative flex-1 flex items-center">
+                            <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.85" class="w-full z-10">
+                            <div class="absolute inset-x-0 h-1.5 bg-white/10 rounded-full overflow-hidden pointer-events-none">
+                                <div id="volumeFill" class="h-full bg-sky-400 w-[85%]"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </footer>
+
+    <!-- מודאל יצירת / שינוי שם רשימת השמעה -->
+    <div id="playlistModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md rounded-2xl p-6 border border-white/10 shadow-2xl">
+            <h3 id="playlistModalTitle" class="text-xl font-bold text-white mb-2">רשימת השמעה חדשה</h3>
+            <p class="text-xs text-slate-400 mb-4">הזינו שם לרשימת ההשמעה שלכם (לדוגמה: "ניגונים רגועים", "שמחה", "לימוד")</p>
+            <input type="text" id="playlistNameInput" placeholder="שם הרשימה..." class="w-full bg-studio-900 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-sky-500 mb-5">
+            <div class="flex items-center justify-end gap-2.5">
+                <button onclick="closePlaylistModal()" class="px-4 py-2 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-colors">ביטול</button>
+                <button onclick="savePlaylistModal()" class="px-5 py-2 rounded-xl text-sm font-semibold bg-sky-500 hover:bg-sky-400 text-studio-950 transition-colors">שמירה</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- מודאל עריכת שם הרצועה (הניגון והיוצר) -->
+    <div id="trackEditModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md rounded-2xl p-6 border border-white/10 shadow-2xl">
+            <h3 class="text-xl font-bold text-white mb-4">עריכת שם הניגון</h3>
+            <label for="trackTitleInput" class="block text-xs text-slate-400 mb-1.5">שם הניגון</label>
+            <input type="text" id="trackTitleInput" maxlength="200" placeholder="שם הניגון..."
+                class="w-full bg-studio-900 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-sky-500 mb-3">
+            <label for="trackArtistInput" class="block text-xs text-slate-400 mb-1.5">יוצר / מקור</label>
+            <input type="text" id="trackArtistInput" maxlength="200" placeholder="יוצר / מקור..."
+                class="w-full bg-studio-900 border border-white/15 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-sky-500 mb-1">
+            <p class="text-[11px] text-slate-500 mt-1">השם משמש לתצוגה ולמיון בלבד; הקובץ במחשב נשאר בשמו המקורי.</p>
+            <p id="trackEditFileName" class="hidden text-[11px] text-slate-500 mt-1 break-all" dir="auto"></p>
+            <div class="flex items-center justify-end gap-2.5 mt-5">
+                <button onclick="closeTrackEditModal()" class="px-4 py-2 rounded-xl text-sm text-slate-300 hover:bg-white/5 transition-colors">ביטול</button>
+                <button onclick="saveTrackEdit()" class="px-5 py-2 rounded-xl text-sm font-semibold bg-sky-500 hover:bg-sky-400 text-studio-950 transition-colors">שמירה</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- מודאל הוספת שיר לרשימת השמעה -->
+    <div id="addToPlaylistModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-sm rounded-2xl p-6 border border-white/10 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white">הוספה לרשימת השמעה</h3>
+                <button onclick="closeAddToPlaylistModal()" class="text-slate-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="modalPlaylistChoices" class="space-y-1.5 max-h-60 overflow-y-auto mb-4">
+                <!-- רשימות לבחירה -->
+            </div>
+            <button onclick="closeAddToPlaylistModal(); openPlaylistModal();" class="w-full py-2.5 rounded-xl border border-dashed border-sky-500/40 text-sky-400 hover:bg-sky-500/10 text-xs font-semibold transition-colors">
+                + צור רשימת השמעה חדשה
+            </button>
+        </div>
+    </div>
+
+    <!-- הודעת Toast צפה במקום alert -->
+    <div id="toastNotification" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 glass-panel px-5 py-3 rounded-2xl border border-sky-500/30 shadow-xl text-sm font-medium text-white flex items-center gap-2.5 transition-all duration-300 opacity-0 pointer-events-none -translate-y-4">
+        <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+        <span id="toastMessage">הודעה</span>
+    </div>
+
+    <!-- אלמנט האודיו המרכזי -->
+    <audio id="audioPlayer" crossorigin="anonymous"></audio>
+
+    <script>
+        /**
+         * ניהול מצב היישום (Application State)
+         */
+        const state = {
+            tracks: [], // { id, title, artist, duration, url, isFavorite, isDemo }
+            playlists: [
+                { id: 'pl-calm', name: 'ניגונים רגועים', trackIds: [] },
+                { id: 'pl-study', name: 'מוזיקה ללימודים', trackIds: [] },
+                { id: 'pl-joy', name: 'ניגוני שמחה', trackIds: [] }
+            ],
+            currentView: 'all', // 'all' | 'favorites' | playlistId
+            currentTrackId: null,
+            isPlaying: false,
+            isShuffle: false,
+            shuffledQueue: [],
+            repeatMode: 'none', // 'none' | 'all' | 'one'
+            playbackSpeeds: [0.75, 1, 1.25, 1.5],
+            speedIndex: 1,
+            sleepTimerMinutes: 0,
+            sleepEndTime: null,
+            sleepInterval: null,
+            modalMode: 'create', // 'create' | 'rename'
+            trackToAddId: null,
+            trackToEditId: null,
+            sortKey: null,   // 'title' | 'artist' | 'duration' | 'fileName' | 'added' | null
+            sortDir: 'asc'   // 'asc' | 'desc'
+        };
+
+        /** מפתח לאחסון מקומי ולתבנית ייצוא/ייבוא */
+        const STORAGE_KEY = 'studio-playlists-v1';
+        const DATA_VERSION = 1;
+        /** מרווח איפוס אוטומטי של שורת החיפוש */
+        const SEARCH_RESET_MS = 30000;
+        let searchResetTimeout = null;
+        let saveDebounceTimeout = null;
+
+        const audio = document.getElementById('audioPlayer');
+        let audioCtx = null;
+        let analyser = null;
+        let sourceNode = null;
+        let visualizerInitialized = false;
+
+        /**
+         * הפקת קבצי שמע אינסטרומנטליים מובנים (WAV Blobs) באמצעות Web Audio Synthesis
+         * מאפשר השמעה מיידית וחלקה ללא צורך בקבצים חיצוניים
+         */
+        function generateSynthWavBlob(notes, tempo, waveType = 'sine', durationSec = 18) {
+            const sampleRate = 44100;
+            const numSamples = sampleRate * durationSec;
+            const buffer = new ArrayBuffer(44 + numSamples * 2);
+            const view = new DataView(buffer);
+
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+
+            // כותרות תקן WAV
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + numSamples * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, numSamples * 2, true);
+
+            const beatDuration = 60 / tempo;
+            for (let i = 0; i < numSamples; i++) {
+                const t = i / sampleRate;
+                const beatIndex = Math.floor(t / beatDuration) % notes.length;
+                const localT = t % beatDuration;
+                const freq = notes[beatIndex];
+
+                // מעטפת צליל רכה (ADSR Envelope) למניעת קליקים
+                const attack = Math.min(1, localT / 0.08);
+                const release = Math.max(0, 1 - (localT / beatDuration) * 0.75);
+                const env = attack * release;
+
+                let sample = 0;
+                if (freq > 0) {
+                    const mainOsc = Math.sin(2 * Math.PI * freq * t);
+                    const harmonicOsc = 0.35 * Math.sin(2 * Math.PI * (freq * 1.5) * t);
+                    const subOsc = 0.25 * Math.sin(2 * Math.PI * (freq * 0.5) * t);
+                    sample = (mainOsc + harmonicOsc + subOsc) * 0.28 * env;
+                }
+
+                // דעיכה עדינה בסוף הרצועה
+                if (t > durationSec - 1.5) {
+                    sample *= Math.max(0, (durationSec - t) / 1.5);
+                }
+
+                const s = Math.max(-1, Math.min(1, sample));
+                view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+
+            return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+        }
+
+        /**
+         * אתחול רצועות הדגמה אינסטרומנטליות מובנות
+         */
+        function initDemoTracks() {
+            const demos = [
+                {
+                    id: 'demo-1',
+                    title: 'ניגון שלווה והתבוננות',
+                    artist: 'הרכב אקוסטי (נעימה מובנית)',
+                    notes: [261.63, 329.63, 392.00, 329.63, 293.66, 349.23, 440.00, 349.23],
+                    tempo: 72,
+                    duration: 20,
+                    isFavorite: true,
+                    playlistIds: ['pl-calm', 'pl-study']
+                },
+                {
+                    id: 'demo-2',
+                    title: 'מנגינת בוקר צלולה',
+                    artist: 'פסנתר ופעמונים (נעימה מובנית)',
+                    notes: [392.00, 440.00, 493.88, 523.25, 493.88, 440.00, 392.00, 329.63],
+                    tempo: 88,
+                    duration: 18,
+                    isFavorite: false,
+                    playlistIds: ['pl-study']
+                },
+                {
+                    id: 'demo-3',
+                    title: 'נעימת שמחה והודיה',
+                    artist: 'אולפן נגינה (נעימה מובנית)',
+                    notes: [293.66, 349.23, 440.00, 523.25, 493.88, 440.00, 392.00, 440.00],
+                    tempo: 112,
+                    duration: 16,
+                    isFavorite: true,
+                    playlistIds: ['pl-joy']
+                },
+                {
+                    id: 'demo-4',
+                    title: 'הרהור שקט לפסנתר',
+                    artist: 'נעימה אינסטרומנטלית',
+                    notes: [220.00, 261.63, 329.63, 392.00, 349.23, 329.63, 293.66, 246.94],
+                    tempo: 66,
+                    duration: 22,
+                    isFavorite: false,
+                    playlistIds: ['pl-calm']
+                }
+            ];
+
+            demos.forEach(d => {
+                const url = generateSynthWavBlob(d.notes, d.tempo, 'sine', d.duration);
+                state.tracks.push({
+                    id: d.id,
+                    title: d.title,
+                    artist: d.artist,
+                    duration: d.duration,
+                    url: url,
+                    isFavorite: d.isFavorite,
+                    isDemo: true
+                });
+
+                d.playlistIds.forEach(plId => {
+                    const pl = state.playlists.find(p => p.id === plId);
+                    if (pl) pl.trackIds.push(d.id);
+                });
+            });
+        }
+
+        /**
+         * שמירה קבועה ב-localStorage
+         * המטא-דאטה (שם, יוצר, מועדפים, רשימות, הגדרות) נשמרת כאן;
+         * קובצי השמע עצמם נשמרים ב-IndexedDB (ראו saveAudioFile)
+         */
+        function saveState() {
+            clearTimeout(saveDebounceTimeout);
+            saveDebounceTimeout = setTimeout(() => {
+                try {
+                    const payload = {
+                        version: DATA_VERSION,
+                        savedAt: new Date().toISOString(),
+                        demoIds: state.tracks.filter(t => t.isDemo).map(t => t.id),
+                        // שמות דמו שערך המשתמש - כדי ששינוי שם ישרוד רענון
+                        demoTracks: state.tracks.filter(t => t.isDemo).map(t => ({
+                            id: t.id,
+                            title: t.title,
+                            artist: t.artist,
+                            isFavorite: !!t.isFavorite
+                        })),
+                        tracks: state.tracks.filter(t => !t.isDemo).map(t => ({
+                            id: t.id,
+                            title: t.title,
+                            artist: t.artist,
+                            fileName: t.fileName || '',
+                            addedAt: getTrackAddedStamp(t),
+                            duration: t.duration || 0,
+                            isFavorite: !!t.isFavorite,
+                            isDemo: false,
+                            hasFile: !!t.url
+                        })),
+                        playlists: state.playlists.map(p => ({ id: p.id, name: p.name, trackIds: [...p.trackIds] })),
+                        settings: {
+                            volume: audio.volume,
+                            muted: audio.muted,
+                            repeatMode: state.repeatMode,
+                            isShuffle: state.isShuffle,
+                            speedIndex: state.speedIndex
+                        }
+                    };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+                    updateStorageInfo();
+                } catch (err) {
+                    console.warn('שמירה מקומית נכשלה:', err);
+                    showToast('שמירה מקומית נכשלה - ייתכן שהאחסון מלא');
+                }
+            }, 250);
+        }
+
+        /** קריאת נתונים שמורים והחלתם על המצב */
+        function loadState() {
+            let raw;
+            try {
+                raw = localStorage.getItem(STORAGE_KEY);
+            } catch (err) {
+                console.warn('קריאה מהאחסון המקומי נכשלה:', err);
+                return false;
+            }
+            if (!raw) return false;
+
+            try {
+                const data = JSON.parse(raw);
+                const applied = applyImportedData(data, { silent: true });
+                if (!applied) return false;
+                restoreDemoTracks(data);
+                // מיזוג שמות דמו שנשמרו (כולל שמירות מגרסאות קודמות) - כדי ששינוי שם ישרוד רענון
+                mergeSavedDemoNames(data);
+                return true;
+            } catch (err) {
+                console.warn('נתונים שמורים פגומים - מתעלמים מהם:', err);
+                return false;
+            }
+        }
+
+        /**
+         * שחזור נעימות הדמו שהיו קיימות בשמירה הקודמת (הן אינן נשמרות עם הקובץ,
+         * אלא נוצרות מחדש) - עם מצב המועדפים והשיוך לרשימות ששמר המשתמש
+         */
+        function restoreDemoTracks(data) {
+            if (!Array.isArray(data.demoIds) || data.demoIds.length === 0) return;
+            if (typeof initDemoTracks !== 'function') return;
+
+            const savedDemoIds = new Set(data.demoIds);
+            const tracksById = new Map();
+            // מצב הרשימות שנשמר (לפני ש-initDemoTracks מאכלס אותן מחדש)
+            const savedPlaylists = state.playlists.map(p => ({ id: p.id, trackIds: [...p.trackIds] }));
+
+            // יצירת כל הדמו הזמינים, ואז השארת רק אלה שהיו קיימים בשמירה
+            const allBefore = new Set(state.tracks.map(t => t.id));
+            initDemoTracks();
+            const createdDemos = state.tracks.filter(t => t.isDemo && !allBefore.has(t.id));
+
+            createdDemos.forEach(t => {
+                if (!savedDemoIds.has(t.id)) {
+                    // דמו שנמחק בעבר - אינו מוחזר
+                    state.tracks = state.tracks.filter(x => x.id !== t.id);
+                    state.playlists.forEach(pl => { pl.trackIds = pl.trackIds.filter(id => id !== t.id); });
+                    if (t.url) URL.revokeObjectURL(t.url);
+                    return;
+                }
+                tracksById.set(t.id, t);
+            });
+
+            // שחזור מצב המועדפים של הדמו (initDemoTracks מחזירה ברירת מחדל)
+            const savedTracks = Array.isArray(data.tracks) ? data.tracks : [];
+            const savedById = new Map(savedTracks.map(t => [t.id, t]));
+            tracksById.forEach((track, id) => {
+                const saved = savedById.get(id);
+                if (saved && typeof saved.isFavorite === 'boolean') track.isFavorite = saved.isFavorite;
+            });
+
+            // שחזור שיוך הדמו לרשימות - לפי מה שנשמר, תוך השמטת דמו שהוסר
+            state.playlists = savedPlaylists.map(sp => {
+                const pl = state.playlists.find(x => x.id === sp.id);
+                return {
+                    id: sp.id,
+                    name: pl ? pl.name : sp.id,
+                    trackIds: sp.trackIds.filter(id => {
+                        const t = state.tracks.find(x => x.id === id);
+                        if (!t) return false;
+                        return !t.isDemo || tracksById.has(id);
+                    })
+                };
+            });
+        }
+
+        /**
+         * מיזוג שם ויוצר של רצועות דמו שנשמרו בנפרד (data.demoTracks) אל תוך המצב.
+         * נקראת אחרי restoreDemoTracks, כך שהיא חלה גם על דמו שזה עתה נוצר מחדש.
+         */
+        function mergeSavedDemoNames(data) {
+            const savedDemos = Array.isArray(data.demoTracks) ? data.demoTracks : [];
+            if (savedDemos.length === 0) return;
+            const byId = new Map(savedDemos.map(t => [t && t.id, t]));
+            state.tracks.forEach(track => {
+                if (!track.isDemo) return;
+                const saved = byId.get(track.id);
+                if (!saved) return;
+                if (typeof saved.title === 'string' && saved.title.trim()) track.title = saved.title.trim();
+                if (typeof saved.artist === 'string' && saved.artist.trim()) track.artist = saved.artist.trim();
+            });
+        }
+
+        /**
+         * החלת נתונים מיובאים (מקובץ או מאחסון מקומי) לאחר ולידציה
+         * @returns {boolean} האם הנתונים היו תקינים
+         */
+        function applyImportedData(data, { silent = false } = {}) {
+            if (!data || typeof data !== 'object' || !Array.isArray(data.tracks) || !Array.isArray(data.playlists)) {
+                if (!silent) showToast('קובץ הנתונים אינו תקין');
+                return false;
+            }
+
+            const cleanStr = (v, fallback = '') => (typeof v === 'string' ? v : fallback);
+            const seenIds = new Set();
+
+            // ולידציה של הרצועות
+            const tracks = [];
+            data.tracks.forEach((t, i) => {
+                if (!t || typeof t !== 'object') return;
+                let id = cleanStr(t.id).trim() || `imported-${Date.now()}-${i}`;
+                if (seenIds.has(id)) id = `${id}-${i}`;
+                seenIds.add(id);
+                tracks.push({
+                    id,
+                    title: cleanStr(t.title, 'ללא שם').trim() || 'ללא שם',
+                    artist: cleanStr(t.artist, 'מקור לא ידוע').trim() || 'מקור לא ידוע',
+                    fileName: cleanStr(t.fileName).trim(),
+                    addedAt: Number.isFinite(+t.addedAt) ? +t.addedAt : 0,
+                    duration: Number.isFinite(+t.duration) && +t.duration >= 0 ? +t.duration : 0,
+                    url: null, // קובץ השמע עצמו אינו נכלל בייצוא - ניתן להשמיע רק לאחר העלאה מחדש
+                    isFavorite: !!t.isFavorite,
+                    isDemo: !!t.isDemo
+                });
+            });
+
+            // ולידציה של רשימות ההשמעה (מסננת מזהים חסרים)
+            const playlists = [];
+            const seenPl = new Set();
+            data.playlists.forEach((p, i) => {
+                if (!p || typeof p !== 'object') return;
+                let id = cleanStr(p.id).trim() || `pl-imported-${Date.now()}-${i}`;
+                if (seenPl.has(id)) id = `${id}-${i}`;
+                seenPl.add(id);
+                const trackIds = Array.isArray(p.trackIds)
+                    ? [...new Set(p.trackIds.filter(id2 => seenIds.has(id2)))]
+                    : [];
+                playlists.push({
+                    id,
+                    name: cleanStr(p.name, 'רשימה ללא שם').trim() || 'רשימה ללא שם',
+                    trackIds
+                });
+            });
+
+            if (tracks.length === 0) {
+                if (!silent) showToast('לא נמצאו רצועות בקובץ');
+                return false;
+            }
+
+            state.tracks = tracks;
+            state.playlists = playlists;
+            state.currentView = 'all';
+            state.currentTrackId = null;
+            state.shuffledQueue = [];
+
+            // החלת הגדרות אופציונליות
+            const s = data.settings || {};
+            if (Number.isFinite(+s.volume)) {
+                audio.volume = Math.min(1, Math.max(0, +s.volume));
+                volumeSlider.value = audio.volume;
+                volumeFill.style.width = `${audio.volume * 100}%`;
+            }
+            if (typeof s.muted === 'boolean') audio.muted = s.muted;
+            if (['none', 'all', 'one'].includes(s.repeatMode)) state.repeatMode = s.repeatMode;
+            if (Number.isInteger(s.speedIndex) && s.speedIndex >= 0 && s.speedIndex < state.playbackSpeeds.length) {
+                state.speedIndex = s.speedIndex;
+                document.getElementById('speedBtn').textContent = `${state.playbackSpeeds[state.speedIndex]}x`;
+            }
+
+            applyRepeatUI();
+            applySpeedUI();
+            updateVolumeIcons();
+            updatePlayerUI();
+            renderAll();
+            return true;
+        }
+
+        /** ייצוא הספרייה והרשימות לקובץ JSON */
+        function exportData() {
+            const payload = {
+                app: 'studio-player',
+                version: DATA_VERSION,
+                exportedAt: new Date().toISOString(),
+                note: 'קובצי השמע עצמם אינם נכללים בייצוא - רק מטא-דאטה, מועדפים, רשימות והגדרות',
+                tracks: state.tracks.map(t => ({
+                    id: t.id,
+                    title: t.title,
+                    artist: t.artist,
+                    duration: t.duration || 0,
+                    isFavorite: !!t.isFavorite,
+                    isDemo: !!t.isDemo
+                })),
+                playlists: state.playlists.map(p => ({ id: p.id, name: p.name, trackIds: [...p.trackIds] })),
+                settings: {
+                    volume: audio.volume,
+                    muted: audio.muted,
+                    repeatMode: state.repeatMode,
+                    isShuffle: state.isShuffle,
+                    speedIndex: state.speedIndex
+                }
+            };
+
+            try {
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const d = new Date();
+                const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `studio-player-backup-${stamp}.json`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                showToast('קובץ הנתונים יוצא בהצלחה');
+            } catch (err) {
+                console.error('Export error:', err);
+                showToast('הייצוא נכשל');
+            }
+        }
+
+        /** ייבוא נתונים מקובץ JSON שנבחר */
+        function handleImportFile(file) {
+            if (!file) return;
+            if (file.size > 10 * 1024 * 1024) {
+                showToast('הקובץ גדול מדי (מקסימום 10MB)');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                let data;
+                try {
+                    data = JSON.parse(String(reader.result));
+                } catch (err) {
+                    showToast('הקובץ אינו בפורמט JSON תקין');
+                    return;
+                }
+                const proceed = state.tracks.length === 0 ||
+                    window.confirm('הייבוא יחליף את הספרייה והרשימות הנוכחיות. להמשיך?');
+                if (!proceed) return;
+                if (applyImportedData(data)) {
+                    clearAllSavedAudio();
+                    saveState();
+                    showToast(`יובאו ${state.tracks.length} רצועות ו-${state.playlists.length} רשימות - יש להעלות את הקבצים מחדש פעם אחת`);
+                }
+            };
+            reader.onerror = () => showToast('שגיאה בקריאת הקובץ');
+            reader.readAsText(file);
+        }
+
+        /** מידע קצר על מצב האחסון המקומי */
+        function updateStorageInfo() {
+            const el = document.getElementById('storageInfo');
+            if (!el) return;
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) {
+                    el.textContent = 'הנתונים יישמרו אוטומטית';
+                    return;
+                }
+                const kb = (new Blob([raw]).size / 1024).toFixed(1);
+                const savedFiles = state.tracks.filter(t => t.url && !t.isDemo).length;
+                el.textContent = savedFiles
+                    ? `נשמר אוטומטית • ${savedFiles} קבצים • ${kb}KB`
+                    : `נשמר אוטומטית • ${kb}KB`;
+            } catch (err) {
+                el.textContent = 'שמירה מקומית לא זמינה';
+            }
+        }
+
+        /** נראות שורת ההערה על קבצים שאינם זמינים */
+        function updateMissingFilesNotice() {
+            const el = document.getElementById('missingFilesNotice');
+            if (!el) return;
+            // רצועות דמו נוצרות מחדש בכל טעינה, לכן אינן נחשבות "חסרות"
+            const count = state.tracks.filter(t => !t.url && !t.isDemo).length;
+            el.textContent = `שים לב: ${count} קבצים אינם שמורים במכשיר (למשל אחרי ייבוא) - העלו אותם פעם אחת והם יישמרו להבא`;
+            el.classList.toggle('hidden', count === 0);
+        }
+
+        /**
+         * הצגת הודעת Toast נקייה
+         */
+        let toastTimeout;
+        function showToast(msg) {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastMessage').textContent = msg;
+            toast.classList.remove('opacity-0', '-translate-y-4');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-4');
+            }, 3000);
+        }
+
+        /**
+         * עיצוב זמן (שניות -> MM:SS)
+         */
+        function formatTime(seconds) {
+            if (!seconds || isNaN(seconds)) return '00:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        /** בריחת תווים מיוחדים לפני הכנסת טקסט למחרוזת HTML */
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        /**
+         * טיפול בהעלאת קבצים מקומיים (File Picker + Drag & Drop)
+         */
+        // fileInput מוגדר אחרי פונקציות האחסון; מאזין מהעלאת קבצים רשום בהמשך הקובץ
+
+        // אירועי גרירת קבצים לחלון
+        const dropOverlay = document.getElementById('dropOverlay');
+        window.addEventListener('dragenter', (e) => {
+            if (e.dataTransfer && e.dataTransfer.types.includes('Files')) {
+                dropOverlay.classList.remove('hidden');
+                dropOverlay.classList.add('flex');
+            }
+        });
+        dropOverlay.addEventListener('dragleave', (e) => {
+            if (e.target === dropOverlay) {
+                dropOverlay.classList.add('hidden');
+                dropOverlay.classList.remove('flex');
+            }
+        });
+        window.addEventListener('dragover', (e) => e.preventDefault());
+        window.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropOverlay.classList.add('hidden');
+            dropOverlay.classList.remove('flex');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleUploadedFiles(e.dataTransfer.files);
+            }
+        });
+
+        /** חילוץ שם רצועה ויוצר משם קובץ (למשל "יוצר - שם.mp3") */
+        function parseFileName(fileName) {
+            const cleanName = fileName.replace(/\.[^/.]+$/, '');
+            if (cleanName.includes(' - ')) {
+                const parts = cleanName.split(' - ');
+                return { artist: parts[0].trim() || 'קובץ מקומי', title: parts.slice(1).join(' - ').trim() || cleanName };
+            }
+            return { artist: 'קובץ מקומי', title: cleanName };
+        }
+
+        /** האם השם/היוצר תואמים לרצועה שממתינה לקובץ (לאחר ייבוא או שחזור) */
+        function findPlaceholder(title, artist) {
+            return state.tracks.find(t => !t.url && t.title === title && t.artist === artist);
+        }
+
+        /**
+         * קליטת קובץ שמע ושיוכו לרצועה קיימת או חדשה.
+         * @param {File} file
+         * @param {{ id?: string, title?: string, artist?: string, persist?: boolean }} [opts]
+         *        id - שיוך ישיר לרצועה (שחזור מהאחסון); persist - האם לשמור את הנתונים ל-IndexedDB
+         * @returns {string} מזהה הרצועה שאליה שויך הקובץ
+         */
+        function ingestAudioFile(file, { id = null, title: givenTitle = null, artist: givenArtist = null, persist = true } = {}) {
+            const parsed = parseFileName(file.name);
+            const title = givenTitle || parsed.title;
+            const artist = givenArtist || parsed.artist;
+            const url = URL.createObjectURL(file);
+
+            // בשיוך ישיר (שחזור מהאחסון) אין התאמה לפי שם - רק לפי מזהה
+            const existing = id
+                ? state.tracks.find(t => t.id === id)
+                : findPlaceholder(title, artist);
+            if (existing) {
+                existing.url = url;
+                if (title) existing.title = title;
+                if (artist) existing.artist = artist;
+                // שם הקובץ המקורי - לשיוך ולהצגה (למעט קובץ שנוצר אוטומטית בשחזור)
+                if (file.name && file.name !== 'audio-restored' && !existing.fileName) existing.fileName = file.name;
+
+                if (persist) saveAudioFile(existing.id, file);
+
+                if (!existing.duration) {
+                    const probe = new Audio();
+                    probe.preload = 'metadata';
+                    probe.addEventListener('loadedmetadata', () => {
+                        existing.duration = probe.duration || 0;
+                        saveState();
+                        if (!state.sortKey) renderAll();
+                    }, { once: true });
+                    probe.src = url;
+                }
+                return existing.id;
+            }
+
+            const addedAt = Date.now();
+            const trackId = id || 'local-' + addedAt + '-' + Math.random().toString(36).slice(2, 8);
+            const newTrack = {
+                id: trackId,
+                title,
+                artist,
+                fileName: file.name || '',
+                addedAt,
+                duration: 0,
+                url,
+                isFavorite: false,
+                isDemo: false
+            };
+
+            const probe = new Audio();
+            probe.preload = 'metadata';
+            probe.addEventListener('loadedmetadata', () => {
+                newTrack.duration = probe.duration || 0;
+                saveState();
+                if (!state.sortKey) renderAll();
+            }, { once: true });
+            probe.src = url;
+
+            state.tracks.unshift(newTrack);
+
+            if (persist) saveAudioFile(trackId, file);
+
+            // אם המשתמש נמצא בתוך רשימת השמעה מותאמת, נוסיף אליה אוטומטית
+            if (state.currentView !== 'all' && state.currentView !== 'favorites') {
+                const pl = state.playlists.find(p => p.id === state.currentView);
+                if (pl) pl.trackIds.push(trackId);
+            }
+            return trackId;
+        }
+
+        function handleUploadedFiles(fileList) {
+            const files = Array.from(fileList).filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac)$/i.test(f.name));
+            if (files.length === 0) {
+                showToast('לא נבחרו קבצי שמע תקינים');
+                return;
+            }
+
+            files.forEach(file => {
+                try {
+                    ingestAudioFile(file);
+                } catch (err) {
+                    console.warn('קליטת קובץ נכשלה:', file.name, err);
+                }
+            });
+
+            saveState();
+            showToast(`נוספו ${files.length} קבצי שמע בהצלחה - נשמרים להפעלה הבאה`);
+            renderAll();
+        }
+
+        // בחירת קבצים מהמחשב
+        const fileInput = document.getElementById('fileInput');
+        fileInput.addEventListener('change', (e) => {
+            handleUploadedFiles(e.target.files);
+            fileInput.value = '';
+        });
+
+        /* ==========================================================
+         * אחסון קובצי השמע ב-IndexedDB - כדי שלא יהיה צורך להעלותם שוב
+         * ========================================================== */
+        const AUDIO_DB_NAME = 'studio-player-audio';
+        const AUDIO_DB_VERSION = 1;
+        const AUDIO_STORE = 'files';
+        let audioDbPromise = null;
+
+        function openAudioDb() {
+            if (audioDbPromise) return audioDbPromise;
+            audioDbPromise = new Promise((resolve, reject) => {
+                if (!window.indexedDB) { reject(new Error('IndexedDB אינו נתמך')); return; }
+                const req = indexedDB.open(AUDIO_DB_NAME, AUDIO_DB_VERSION);
+                req.onupgradeneeded = () => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains(AUDIO_STORE)) db.createObjectStore(AUDIO_STORE);
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            }).catch(err => {
+                audioDbPromise = null;
+                throw err;
+            });
+            return audioDbPromise;
+        }
+
+        /** שמירת קובץ השמע לצמיתות (ברקע, לא חוסם את הממשק) */
+        async function saveAudioFile(trackId, file) {
+            try {
+                const db = await openAudioDb();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(AUDIO_STORE, 'readwrite');
+                    tx.objectStore(AUDIO_STORE).put(file, trackId);
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                    tx.onabort = () => reject(tx.error || new Error('שמירת הקובץ בוטלה'));
+                });
+                updateStorageInfo();
+                return true;
+            } catch (err) {
+                console.warn('שמירת קובץ השמע נכשלה:', err);
+                showToast('הקובץ לא נשמר לצמיתות - ייתכן שאין מקום באחסון');
+                return false;
+            }
+        }
+
+        async function deleteAudioFile(trackId) {
+            try {
+                const db = await openAudioDb();
+                const tx = db.transaction(AUDIO_STORE, 'readwrite');
+                tx.objectStore(AUDIO_STORE).delete(trackId);
+                updateStorageInfo();
+            } catch (err) {
+                console.warn('מחיקת קובץ מהאחסון נכשלה:', err);
+            }
+        }
+
+        async function getAllSavedAudioIds() {
+            try {
+                const db = await openAudioDb();
+                return await new Promise((resolve, reject) => {
+                    const tx = db.transaction(AUDIO_STORE, 'readonly');
+                    const req = tx.objectStore(AUDIO_STORE).getAllKeys();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => reject(req.error);
+                });
+            } catch (err) {
+                return [];
+            }
+        }
+
+        /**
+         * שחזור קובצי השמע השמורים בעת טעינת האפליקציה
+         * @returns {Promise<number>} מספר הקבצים ששוחזרו
+         */
+        async function restoreSavedAudio() {
+            let db;
+            try {
+                db = await openAudioDb();
+            } catch (err) {
+                console.warn('אחסון קבצי השמע אינו זמין:', err);
+                return 0;
+            }
+
+            const entries = await new Promise((resolve, reject) => {
+                const tx = db.transaction(AUDIO_STORE, 'readonly');
+                const req = tx.objectStore(AUDIO_STORE).openCursor();
+                const out = [];
+                req.onsuccess = () => {
+                    const cursor = req.result;
+                    if (!cursor) { resolve(out); return; }
+                    out.push({ id: cursor.key, file: cursor.value });
+                    cursor.continue();
+                };
+                req.onerror = () => reject(req.error);
+            }).catch(err => {
+                console.warn('קריאת קבצים שמורים נכשלה:', err);
+                return [];
+            });
+
+            let restored = 0;
+            entries.forEach(({ id, file }) => {
+                if (!file || !file.size) return;
+                const track = state.tracks.find(t => t.id === id);
+                // רצועה שנמחקה מהספרייה (או דמו שמתחדש) - מנקים את הקובץ השמור שלה
+                const isStaleDemo = track && track.isDemo;
+                if (!track || isStaleDemo) { deleteAudioFile(id); return; }
+                if (track.url) return;
+
+                try {
+                    // file חייב לשמור על שם מקורי; אם אין - משתמשים בשם הרצועה
+                    // קובץ ללא שם מקורי - שם זמני; שם התצוגה נלקח מהרצועה עצמה
+                    const restoreFile = file.name ? file : new File([file], 'audio-restored', { type: file.type || 'audio/mpeg' });
+                    ingestAudioFile(restoreFile, {
+                        id,
+                        title: track.title,
+                        artist: track.artist,
+                        persist: false
+                    });
+                } catch (err) {
+                    console.warn('שחזור קובץ שמע נכשל:', id, err);
+                    return;
+                }
+                restored++;
+            });
+
+            return restored;
+        }
+
+        /**
+         * הסרת קבצי שמע שמורים שאין להם רצועה מתאימה (ניקוי אחסון)
+         */
+        async function cleanupOrphanAudio() {
+            const savedIds = await getAllSavedAudioIds();
+            if (savedIds.length === 0) return;
+            const trackIds = new Set(state.tracks.map(t => t.id));
+            const orphans = savedIds.filter(id => !trackIds.has(id));
+            await Promise.all(orphans.map(deleteAudioFile));
+        }
+
+        /** ניקוי כל קובצי השמע השמורים (נקרא לפני החלפת נתונים בייבוא) */
+        async function clearAllSavedAudio() {
+            try {
+                const db = await openAudioDb();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(AUDIO_STORE, 'readwrite');
+                    tx.objectStore(AUDIO_STORE).clear();
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+                updateStorageInfo();
+            } catch (err) {
+                console.warn('ניקוי קובצי השמע נכשל:', err);
+            }
+        }
+
+        /** מיון הרשימה הנוכחית (לחיצה חוזרת מחליפה כיוון, לחיצה שלישית מחזירה לסדר מקורי) */
+        function toggleSort(key) {
+            if (state.sortKey !== key) {
+                state.sortKey = key;
+                state.sortDir = 'asc';
+            } else if (state.sortDir === 'asc') {
+                state.sortDir = 'desc';
+            } else {
+                state.sortKey = null;
+                state.sortDir = 'asc';
+            }
+            renderTrackList();
+        }
+
+        /** נרמול טקסט למיון אלפביתי עברי/לטיני */
+        function normalizeForSort(value) {
+            return String(value || '')
+                .replace(/[֑-ׇ]/g, '')  // ניקוד וטעמים
+                .replace(/["'׳״]/g, '')
+                .trim()
+                .toLowerCase();
+        }
+
+        /** מיון הרשימה לפי המפתח והכיוון הנוכחיים
+         *  מפתחות: title | artist | duration | fileName | added
+         */
+        function applySort(list) {
+            if (!state.sortKey) return list;
+            const dir = state.sortDir === 'asc' ? 1 : -1;
+            const collator = new Intl.Collator('he', { numeric: true, sensitivity: 'base' });
+
+            if (state.sortKey === 'duration') {
+                return [...list].sort((a, b) => ((a.duration || 0) - (b.duration || 0)) * dir);
+            }
+
+            return [...list].sort((a, b) =>
+                collator.compare(normalizeForSort(a[state.sortKey]), normalizeForSort(b[state.sortKey])) * dir);
+        }
+
+        /** עדכון חזותי של חצים ולחצני מיון */
+        function updateSortUI() {
+            document.querySelectorAll('#tableHeaderRow .sortable').forEach(el => {
+                const active = el.dataset.sort === state.sortKey;
+                el.classList.toggle('active', active);
+                const arrow = el.querySelector('.sort-arrow');
+                if (arrow) arrow.textContent = active ? (state.sortDir === 'asc' ? '▲' : '▼') : '↕';
+            });
+            document.querySelectorAll('.sort-badge').forEach(el => {
+                const active = el.dataset.sort === state.sortKey;
+                el.classList.toggle('bg-sky-500/15', active);
+                el.classList.toggle('text-sky-400', active);
+                el.classList.toggle('bg-white/5', !active);
+                el.classList.toggle('text-slate-300', !active);
+            });
+        }
+
+        /**
+         * בחירת קובץ לייבוא
+         */
+        document.getElementById('importInput').addEventListener('change', (e) => {
+            handleImportFile(e.target.files[0]);
+            e.target.value = '';
+        });
+
+        /**
+         * חיפוש עם איפוס אוטומטי
+         */
+        function onSearchInput() {
+            renderTrackList();
+            updateSearchUI();
+            scheduleSearchReset();
+        }
+
+        function updateSearchUI() {
+            const input = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('clearSearchBtn');
+            clearBtn.classList.toggle('hidden', input.value.length === 0);
+        }
+
+        function clearSearch() {
+            const input = document.getElementById('searchInput');
+            input.value = '';
+            clearTimeout(searchResetTimeout);
+            updateSearchUI();
+            renderTrackList();
+        }
+
+        function scheduleSearchReset() {
+            clearTimeout(searchResetTimeout);
+            if (!document.getElementById('searchInput').value) return;
+            searchResetTimeout = setTimeout(clearSearch, SEARCH_RESET_MS);
+        }
+
+        /**
+         * אתחול Web Audio API לויזואלייזר החי
+         */
+        function initVisualizer() {
+            if (visualizerInitialized) return;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 64;
+                sourceNode = audioCtx.createMediaElementSource(audio);
+                sourceNode.connect(analyser);
+                analyser.connect(audioCtx.destination);
+                visualizerInitialized = true;
+                drawVisualizer();
+            } catch (err) {
+                console.warn('Visualizer fallback active:', err);
+            }
+        }
+
+        function drawVisualizer() {
+            const canvas = document.getElementById('visualizerCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            // התאמת רזולוציית הקנבס
+            if (canvas.width !== canvas.clientWidth) {
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+            }
+
+            const bufferLength = analyser ? analyser.frequencyBinCount : 32;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function renderFrame() {
+                requestAnimationFrame(renderFrame);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (analyser && state.isPlaying) {
+                    analyser.getByteFrequencyData(dataArray);
+                } else {
+                    for (let i = 0; i < bufferLength; i++) {
+                        dataArray[i] = state.isPlaying ? Math.random() * 120 + 30 : 8;
+                    }
+                }
+
+                const barCount = 24;
+                const gap = 3;
+                const barWidth = (canvas.width - (barCount - 1) * gap) / barCount;
+
+                for (let i = 0; i < barCount; i++) {
+                    const value = dataArray[i] || 0;
+                    const percent = value / 255;
+                    const barHeight = Math.max(4, percent * (canvas.height - 8));
+                    const x = i * (barWidth + gap);
+                    const y = canvas.height - barHeight;
+
+                    const gradient = ctx.createLinearGradient(0, y, 0, canvas.height);
+                    gradient.addColorStop(0, '#38bdf8');
+                    gradient.addColorStop(1, '#6366f1');
+
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, barWidth, barHeight, 3);
+                    ctx.fill();
+                }
+            }
+            renderFrame();
+        }
+
+        /**
+         * ניהול השמעה ובקרת נגן (Playback Controls)
+         */
+        function playTrack(trackId) {
+            const track = state.tracks.find(t => t.id === trackId);
+            if (!track) return;
+
+            // קובץ שנשמר מאחסון מקומי ללא קובץ שמע בפועל
+            if (!track.url) {
+                showToast('קובץ השמע אינו זמין - העלו אותו מחדש מהמחשב');
+                return;
+            }
+
+            initVisualizer();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            state.currentTrackId = track.id;
+            audio.src = track.url;
+            audio.playbackRate = state.playbackSpeeds[state.speedIndex];
+            
+            audio.play().then(() => {
+                state.isPlaying = true;
+                updatePlayerUI();
+                renderTrackList();
+            }).catch(err => {
+                console.error('Playback error:', err);
+                showToast('שגיאה בהפעלת קובץ השמע');
+            });
+        }
+
+        function togglePlayPause() {
+            if (!state.currentTrackId) {
+                const visible = getVisibleTracks();
+                if (visible.length > 0) {
+                    playTrack(visible[0].id);
+                } else {
+                    showToast('אין שירים ברשימה להפעלה');
+                }
+                return;
+            }
+
+            initVisualizer();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            if (audio.paused) {
+                audio.play();
+                state.isPlaying = true;
+            } else {
+                audio.pause();
+                state.isPlaying = false;
+            }
+            updatePlayerUI();
+            renderTrackList();
+        }
+
+        function getPlaybackContextList() {
+            const visible = getVisibleTracks();
+            if (visible.some(t => t.id === state.currentTrackId)) {
+                return visible;
+            }
+            return state.tracks;
+        }
+
+        function nextTrack(autoTriggered = false) {
+            const list = getPlaybackContextList();
+            if (list.length === 0) return;
+
+            if (autoTriggered && state.repeatMode === 'one') {
+                audio.currentTime = 0;
+                audio.play();
+                return;
+            }
+
+            if (state.isShuffle) {
+                // ערבוב חכם: מונע חזרה על שירים שכבר נוגנו בסבב הנוכחי
+                let remaining = list.filter(t => !state.shuffledQueue.includes(t.id) && t.id !== state.currentTrackId);
+                if (remaining.length === 0) {
+                    if (autoTriggered && state.repeatMode === 'none') {
+                        state.isPlaying = false;
+                        state.shuffledQueue = [];
+                        updatePlayerUI();
+                        return;
+                    }
+                    state.shuffledQueue = [];
+                    remaining = list.filter(t => t.id !== state.currentTrackId);
+                    if (remaining.length === 0) remaining = list;
+                }
+                const next = remaining[Math.floor(Math.random() * remaining.length)];
+                state.shuffledQueue.push(next.id);
+                playTrack(next.id);
+                return;
+            }
+
+            const currentIndex = list.findIndex(t => t.id === state.currentTrackId);
+            if (currentIndex === -1) {
+                playTrack(list[0].id);
+                return;
+            }
+
+            if (currentIndex + 1 < list.length) {
+                playTrack(list[currentIndex + 1].id);
+            } else if (state.repeatMode === 'all' || !autoTriggered) {
+                playTrack(list[0].id);
+            } else {
+                state.isPlaying = false;
+                updatePlayerUI();
+                renderTrackList();
+            }
+        }
+
+        function prevTrack() {
+            if (audio.currentTime > 3) {
+                audio.currentTime = 0;
+                return;
+            }
+            const list = getPlaybackContextList();
+            if (list.length === 0) return;
+
+            const currentIndex = list.findIndex(t => t.id === state.currentTrackId);
+            if (currentIndex > 0) {
+                playTrack(list[currentIndex - 1].id);
+            } else {
+                playTrack(list[list.length - 1].id);
+            }
+        }
+
+        function playCurrentListShuffled() {
+            const list = getVisibleTracks();
+            if (list.length === 0) {
+                showToast('הרשימה ריקה');
+                return;
+            }
+            state.isShuffle = true;
+            state.shuffledQueue = [];
+            updateShuffleUI();
+            const randomTrack = list[Math.floor(Math.random() * list.length)];
+            state.shuffledQueue.push(randomTrack.id);
+            playTrack(randomTrack.id);
+            showToast('מופעל במצב ערבוב חכם');
+        }
+
+        function toggleShuffle() {
+            state.isShuffle = !state.isShuffle;
+            state.shuffledQueue = state.currentTrackId ? [state.currentTrackId] : [];
+            updateShuffleUI();
+            saveState();
+            showToast(state.isShuffle ? 'ערבוב שירים פעיל' : 'ערבוב שירים כבוי');
+        }
+
+        function updateShuffleUI() {
+            const btn = document.getElementById('shuffleBtn');
+            const dot = document.getElementById('shuffleDot');
+            if (state.isShuffle) {
+                btn.classList.add('text-sky-400', 'bg-sky-500/10');
+                btn.classList.remove('text-slate-400');
+                dot.classList.remove('hidden');
+            } else {
+                btn.classList.remove('text-sky-400', 'bg-sky-500/10');
+                btn.classList.add('text-slate-400');
+                dot.classList.add('hidden');
+            }
+        }
+
+        /** עדכון חזותי של כפתור החזרה (ללא הודעה) */
+        function applyRepeatUI() {
+            const btn = document.getElementById('repeatBtn');
+            const badge = document.getElementById('repeatOneBadge');
+
+            btn.classList.remove('text-sky-400', 'bg-sky-500/10', 'text-slate-400');
+            badge.classList.add('hidden');
+
+            if (state.repeatMode === 'none') {
+                btn.classList.add('text-slate-400');
+                btn.title = 'חזרה: כבוי';
+            } else if (state.repeatMode === 'all') {
+                btn.classList.add('text-sky-400', 'bg-sky-500/10');
+                btn.title = 'חזרה על כל הרשימה';
+            } else {
+                btn.classList.add('text-sky-400', 'bg-sky-500/10');
+                badge.classList.remove('hidden');
+                btn.title = 'חזרה על שיר בודד';
+            }
+        }
+
+        function cycleRepeatMode() {
+            const modes = ['none', 'all', 'one'];
+            const nextIdx = (modes.indexOf(state.repeatMode) + 1) % modes.length;
+            state.repeatMode = modes[nextIdx];
+            applyRepeatUI();
+
+            const messages = {
+                none: 'חזרה: כבוי',
+                all: 'חזרה על כל הרשימה',
+                one: 'חזרה על שיר בודד'
+            };
+            saveState();
+            showToast(messages[state.repeatMode]);
+        }
+
+        /** עדכון חזותי של כפתור המהירות (ללא הודעה) */
+        function applySpeedUI() {
+            const speed = state.playbackSpeeds[state.speedIndex];
+            audio.playbackRate = speed;
+            document.getElementById('speedBtn').textContent = `${speed}x`;
+        }
+
+        function cyclePlaybackSpeed() {
+            state.speedIndex = (state.speedIndex + 1) % state.playbackSpeeds.length;
+            applySpeedUI();
+            saveState();
+            showToast(`מהירות השמעה: ${state.playbackSpeeds[state.speedIndex]}x`);
+        }
+
+        /**
+         * טיימר כיבוי (Sleep Timer)
+         */
+        function toggleSleepMenu() {
+            document.getElementById('sleepMenu').classList.toggle('hidden');
+        }
+
+        function setSleepTimer(minutes) {
+            document.getElementById('sleepMenu').classList.add('hidden');
+            clearInterval(state.sleepInterval);
+            state.sleepTimerMinutes = minutes;
+
+            const label = document.getElementById('sleepTimerLabel');
+            const btn = document.getElementById('sleepTimerBtn');
+
+            if (minutes === 0) {
+                state.sleepEndTime = null;
+                label.textContent = 'טיימר';
+                btn.classList.remove('border-indigo-500/50', 'bg-indigo-500/15', 'text-indigo-300');
+                showToast('טיימר כיבוי בוטל');
+                return;
+            }
+
+            state.sleepEndTime = Date.now() + minutes * 60 * 1000;
+            btn.classList.add('border-indigo-500/50', 'bg-indigo-500/15', 'text-indigo-300');
+            showToast(`הנגן יכבה אוטומטית בעוד ${minutes} דקות`);
+
+            const updateCountdown = () => {
+                const diff = state.sleepEndTime - Date.now();
+                if (diff <= 0) {
+                    clearInterval(state.sleepInterval);
+                    audio.pause();
+                    state.isPlaying = false;
+                    updatePlayerUI();
+                    label.textContent = 'טיימר';
+                    btn.classList.remove('border-indigo-500/50', 'bg-indigo-500/15', 'text-indigo-300');
+                    showToast('טיימר הכיבוי הסתיים - ההשמעה הושהתה');
+                } else {
+                    const minsLeft = Math.ceil(diff / 60000);
+                    label.textContent = `${minsLeft} דק'`;
+                }
+            };
+            updateCountdown();
+            state.sleepInterval = setInterval(updateCountdown, 5000);
+        }
+
+        /**
+         * אירועי סרגל התקדמות ועוצמת שמע
+         */
+        const seekBar = document.getElementById('seekBar');
+        const seekProgressFill = document.getElementById('seekProgressFill');
+
+        audio.addEventListener('timeupdate', () => {
+            if (!audio.duration) return;
+            const percent = (audio.currentTime / audio.duration) * 100;
+            seekBar.value = percent;
+            seekProgressFill.style.width = `${percent}%`;
+            document.getElementById('currentTimeDisplay').textContent = formatTime(audio.currentTime);
+            document.getElementById('totalDurationDisplay').textContent = formatTime(audio.duration);
+        });
+
+        audio.addEventListener('ended', () => {
+            nextTrack(true);
+        });
+
+        seekBar.addEventListener('input', (e) => {
+            if (!audio.duration) return;
+            const seekTo = (e.target.value / 100) * audio.duration;
+            audio.currentTime = seekTo;
+            seekProgressFill.style.width = `${e.target.value}%`;
+        });
+
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeFill = document.getElementById('volumeFill');
+        volumeSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            audio.volume = val;
+            audio.muted = (val === 0);
+            volumeFill.style.width = `${val * 100}%`;
+            updateVolumeIcons();
+            saveState();
+        });
+
+        function toggleMute() {
+            audio.muted = !audio.muted;
+            if (!audio.muted && audio.volume === 0) {
+                audio.volume = 0.5;
+                volumeSlider.value = 0.5;
+            }
+            volumeFill.style.width = audio.muted ? '0%' : `${audio.volume * 100}%`;
+            updateVolumeIcons();
+            saveState();
+        }
+
+        function updateVolumeIcons() {
+            const high = document.getElementById('volHighIcon');
+            const mute = document.getElementById('volMuteIcon');
+            if (audio.muted || audio.volume === 0) {
+                high.classList.add('hidden');
+                mute.classList.remove('hidden');
+            } else {
+                high.classList.remove('hidden');
+                mute.classList.add('hidden');
+            }
+        }
+
+        /**
+         * עדכון ממשק הנגן התחתון
+         */
+        function updatePlayerUI() {
+            const playIcon = document.getElementById('playIcon');
+            const pauseIcon = document.getElementById('pauseIcon');
+            const statusEl = document.getElementById('visualizerStatus');
+
+            if (state.isPlaying) {
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+                statusEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping"></span> מנגן`;
+                statusEl.className = 'text-sky-400 flex items-center gap-1.5';
+            } else {
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+                statusEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> מושהה`;
+                statusEl.className = 'text-slate-400 flex items-center gap-1.5';
+            }
+
+            const track = state.tracks.find(t => t.id === state.currentTrackId);
+            const favBtn = document.getElementById('nowPlayingFavBtn');
+            if (track) {
+                document.getElementById('nowPlayingTitle').textContent = track.title;
+                document.getElementById('nowPlayingArtist').textContent = track.artist;
+                favBtn.classList.remove('hidden');
+                favBtn.innerHTML = track.isFavorite
+                    ? `<svg class="w-4 h-4 text-amber-400 fill-amber-400" viewBox="0 0 24 24"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>`
+                    : `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>`;
+            }
+        }
+
+        /**
+         * ניהול מועדפים ורשימות השמעה
+         */
+        function toggleFavorite(trackId, e) {
+            if (e) e.stopPropagation();
+            const track = state.tracks.find(t => t.id === trackId);
+            if (!track) return;
+            track.isFavorite = !track.isFavorite;
+            updatePlayerUI();
+            renderAll();
+            saveState();
+            showToast(track.isFavorite ? 'נוסף למועדפים' : 'הוסר מהמועדפים');
+        }
+
+        function toggleCurrentTrackFavorite() {
+            if (state.currentTrackId) {
+                toggleFavorite(state.currentTrackId);
+            }
+        }
+
+        function selectView(viewId) {
+            state.currentView = viewId;
+            // איפוס החיפוש במעבר בין תצוגות
+            document.getElementById('searchInput').value = '';
+            updateSearchUI();
+            toggleSidebar(false);
+            renderAll();
+        }
+
+        function openPlaylistModal() {
+            state.modalMode = 'create';
+            document.getElementById('playlistModalTitle').textContent = 'רשימת השמעה חדשה';
+            document.getElementById('playlistNameInput').value = '';
+            document.getElementById('playlistModal').classList.remove('hidden');
+            document.getElementById('playlistModal').classList.add('flex');
+            document.getElementById('playlistNameInput').focus();
+        }
+
+        function openRenamePlaylistModal() {
+            const pl = state.playlists.find(p => p.id === state.currentView);
+            if (!pl) return;
+            state.modalMode = 'rename';
+            document.getElementById('playlistModalTitle').textContent = 'שינוי שם רשימת השמעה';
+            document.getElementById('playlistNameInput').value = pl.name;
+            document.getElementById('playlistModal').classList.remove('hidden');
+            document.getElementById('playlistModal').classList.add('flex');
+            document.getElementById('playlistNameInput').focus();
+        }
+
+        function closePlaylistModal() {
+            document.getElementById('playlistModal').classList.add('hidden');
+            document.getElementById('playlistModal').classList.remove('flex');
+        }
+
+        function savePlaylistModal() {
+            const name = document.getElementById('playlistNameInput').value.trim();
+            if (!name) {
+                showToast('נא להזין שם לרשימה');
+                return;
+            }
+
+            if (state.modalMode === 'create') {
+                const newId = 'pl-' + Date.now();
+                state.playlists.push({ id: newId, name: name, trackIds: [] });
+                state.currentView = newId;
+                showToast(`נוצרה רשימה חדשה: "${name}"`);
+            } else {
+                const pl = state.playlists.find(p => p.id === state.currentView);
+                if (pl) {
+                    pl.name = name;
+                    showToast('שם הרשימה עודכן');
+                }
+            }
+
+            closePlaylistModal();
+            saveState();
+            renderAll();
+        }
+
+        function deleteCurrentPlaylist() {
+            const idx = state.playlists.findIndex(p => p.id === state.currentView);
+            if (idx === -1) return;
+            const deletedName = state.playlists[idx].name;
+            state.playlists.splice(idx, 1);
+            state.currentView = 'all';
+            saveState();
+            renderAll();
+            showToast(`רשימת "${deletedName}" נמחקה`);
+        }
+
+        // הוספת שיר לרשימת השמעה
+        function openAddToPlaylistModal(trackId, e) {
+            if (e) e.stopPropagation();
+            state.trackToAddId = trackId;
+            const container = document.getElementById('modalPlaylistChoices');
+            container.innerHTML = '';
+
+            if (state.playlists.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">עדיין לא נוצרו רשימות השמעה</p>`;
+            } else {
+                state.playlists.forEach(pl => {
+                    const exists = pl.trackIds.includes(trackId);
+                    const btn = document.createElement('button');
+                    btn.className = `w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm transition-colors ${exists ? 'bg-sky-500/15 text-sky-400' : 'hover:bg-white/5 text-slate-200'}`;
+                    btn.innerHTML = `
+                        <span>${pl.name}</span>
+                        <span class="text-xs">${exists ? '✓ ברשימה' : '+ הוסף'}</span>
+                    `;
+                    btn.onclick = () => {
+                        if (exists) {
+                            pl.trackIds = pl.trackIds.filter(id => id !== trackId);
+                            showToast(`הוסר מ-"${pl.name}"`);
+                        } else {
+                            pl.trackIds.push(trackId);
+                            showToast(`נוסף ל-"${pl.name}"`);
+                        }
+                        closeAddToPlaylistModal();
+                        saveState();
+                        renderAll();
+                    };
+                    container.appendChild(btn);
+                });
+            }
+
+            document.getElementById('addToPlaylistModal').classList.remove('hidden');
+            document.getElementById('addToPlaylistModal').classList.add('flex');
+        }
+
+        function closeAddToPlaylistModal() {
+            document.getElementById('addToPlaylistModal').classList.add('hidden');
+            document.getElementById('addToPlaylistModal').classList.remove('flex');
+        }
+
+        function removeFromCurrentPlaylist(trackId, e) {
+            if (e) e.stopPropagation();
+            const pl = state.playlists.find(p => p.id === state.currentView);
+            if (!pl) return;
+            pl.trackIds = pl.trackIds.filter(id => id !== trackId);
+            saveState();
+            renderAll();
+            showToast('הרצועה הוסרה מרשימת ההשמעה');
+        }
+
+        function moveTrackInPlaylist(index, direction, e) {
+            if (e) e.stopPropagation();
+            const pl = state.playlists.find(p => p.id === state.currentView);
+            if (!pl) return;
+            const targetIndex = index + direction;
+            if (targetIndex < 0 || targetIndex >= pl.trackIds.length) return;
+            const temp = pl.trackIds[index];
+            pl.trackIds[index] = pl.trackIds[targetIndex];
+            pl.trackIds[targetIndex] = temp;
+            saveState();
+            renderAll();
+        }
+
+        function deleteTrackFromLibrary(trackId, e) {
+            if (e) e.stopPropagation();
+            const toDelete = state.tracks.find(t => t.id === trackId);
+            const confirmMsg = toDelete
+                ? `למחוק את "${toDelete.title}" מהספרייה? הקובץ השמור במכשיר יימחק גם הוא.`
+                : 'למחוק את הרצועה מהספרייה?';
+            // מחיקה מכאן אינה ניתנת לביטול - מבקשים אישור
+            if (!window.confirm(confirmMsg)) return;
+            deleteAudioFile(trackId);
+            // שחרור ה-Blob URL של הרצועה (רק אם אינו הקובץ הנוכחי של הנגן)
+            const removed = state.tracks.find(t => t.id === trackId);
+            if (removed && removed.url && state.currentTrackId !== trackId) {
+                URL.revokeObjectURL(removed.url);
+            }
+            state.tracks = state.tracks.filter(t => t.id !== trackId);
+            state.playlists.forEach(pl => {
+                pl.trackIds = pl.trackIds.filter(id => id !== trackId);
+            });
+            if (state.currentTrackId === trackId) {
+                audio.pause();
+                state.currentTrackId = null;
+                state.isPlaying = false;
+                updatePlayerUI();
+            }
+            saveState();
+            renderAll();
+            showToast('הקובץ הוסר מהספרייה');
+        }
+
+        /**
+         * חותמת זמן ההוספה של הרצועה.
+         * עדיפות: addedAt שנשמר במפורש, ואם אין - המספר שבמזהה הגלובלי (local-<timestamp>-...)
+         * רצועות דמו או מזהה לא-מספרי מחזירים 0/שלילי (ללא תאריך).
+         */
+        function getTrackAddedStamp(track) {
+            if (!track) return 0;
+            if (Number.isFinite(track.addedAt)) return track.addedAt;
+            const m = /^local-(\d{10,})/.exec(String(track.id || ''));
+            return m ? Number(m[1]) : -1;
+        }
+
+        /** תאריך הוספה קצר לתצוגת הטבלה */
+        function formatAddedDate(track) {
+            const stamp = getTrackAddedStamp(track);
+            if (!stamp || stamp < 0) return '—';
+            const d = new Date(stamp);
+            if (isNaN(d.getTime())) return '—';
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            return `${dd}/${mm}/${String(d.getFullYear()).slice(-2)}`;
+        }
+
+        /**
+         * עריכת שם הרצועה (שם ניגון ויוצר) - שינוי התצוגה בלבד,
+         * שם הקובץ המקורי במחשב נשמר כפי שהוא
+         */
+        function openTrackEditModal(trackId, e) {
+            if (e) e.stopPropagation();
+            const track = state.tracks.find(t => t.id === trackId);
+            if (!track) return;
+            state.trackToEditId = trackId;
+            document.getElementById('trackTitleInput').value = track.title || '';
+            document.getElementById('trackArtistInput').value = track.artist || '';
+            const fileNameEl = document.getElementById('trackEditFileName');
+            if (track.fileName) {
+                fileNameEl.textContent = `שם הקובץ המקורי: ${track.fileName}`;
+                fileNameEl.classList.remove('hidden');
+            } else {
+                fileNameEl.classList.add('hidden');
+            }
+            const modal = document.getElementById('trackEditModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            const input = document.getElementById('trackTitleInput');
+            input.focus();
+            input.select();
+        }
+
+        function closeTrackEditModal() {
+            state.trackToEditId = null;
+            const modal = document.getElementById('trackEditModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveTrackEdit() {
+            const track = state.tracks.find(t => t.id === state.trackToEditId);
+            if (!track) { closeTrackEditModal(); return; }
+
+            const newTitle = document.getElementById('trackTitleInput').value.trim();
+            const newArtist = document.getElementById('trackArtistInput').value.trim();
+            if (!newTitle) {
+                showToast('נא להזין שם לניגון');
+                return;
+            }
+
+            track.title = newTitle;
+            track.artist = newArtist || 'מקור לא ידוע';
+
+            // שם הקובץ המקורי נשאר במכשיר - רק מודיעים על כך
+            const fileName = track.fileName;
+            closeTrackEditModal();
+            saveState();
+            // רינדור מיידי של הרשימה והנגן - לא ממתינים לדיבאונס השמירה
+            renderTrackList();
+            updatePlayerUI();
+            showToast(fileName ? 'השם עודכן (שם הקובץ המקורי נשמר)' : 'השם עודכן');
+        }
+
+        /**
+         * סינון והצגת הרשימות (Rendering)
+         */
+        function getVisibleTracks() {
+            const query = document.getElementById('searchInput').value.trim().toLowerCase();
+            let list = [];
+
+            if (state.currentView === 'all') {
+                list = [...state.tracks];
+            } else if (state.currentView === 'favorites') {
+                list = state.tracks.filter(t => t.isFavorite);
+            } else {
+                const pl = state.playlists.find(p => p.id === state.currentView);
+                if (pl) {
+                    list = pl.trackIds
+                        .map(id => state.tracks.find(t => t.id === id))
+                        .filter(Boolean);
+                }
+            }
+
+            if (query) {
+                const normQuery = normalizeForSort(query);
+                list = list.filter(t =>
+                    normalizeForSort(t.title).includes(normQuery) ||
+                    normalizeForSort(t.artist).includes(normQuery)
+                );
+            }
+
+            return list;
+        }
+
+        function renderSidebar() {
+            document.getElementById('count-all').textContent = state.tracks.length;
+            document.getElementById('count-favorites').textContent = state.tracks.filter(t => t.isFavorite).length;
+
+            // הדגשת לשונית פעילה
+            ['all', 'favorites'].forEach(v => {
+                const el = document.getElementById(`nav-${v}`);
+                if (state.currentView === v) {
+                    el.className = 'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors bg-sky-500/15 text-sky-400';
+                } else {
+                    el.className = 'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-white/5 transition-colors';
+                }
+            });
+
+            const container = document.getElementById('playlistsNavContainer');
+            container.innerHTML = '';
+
+            state.playlists.forEach(pl => {
+                const isActive = state.currentView === pl.id;
+                const btn = document.createElement('button');
+                btn.onclick = () => selectView(pl.id);
+                btn.className = `w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive ? 'bg-sky-500/15 text-sky-400' : 'text-slate-300 hover:bg-white/5'}`;
+                btn.innerHTML = `
+                    <div class="flex items-center gap-3 min-w-0">
+                        <svg class="w-4 h-4 shrink-0 ${isActive ? 'text-sky-400' : 'text-slate-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                        <span class="truncate">${escapeHtml(pl.name)}</span>
+                    </div>
+                    <span class="text-xs px-2 py-0.5 rounded-full bg-white/10 text-slate-300">${pl.trackIds.length}</span>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        function renderHeaderBanner(visibleTracks) {
+            const titleEl = document.getElementById('viewTitle');
+            const badgeEl = document.getElementById('viewBadge');
+            const subtitleEl = document.getElementById('viewSubtitle');
+            const actionsEl = document.getElementById('playlistActions');
+
+            const totalSeconds = visibleTracks.reduce((acc, t) => acc + (t.duration || 0), 0);
+            subtitleEl.textContent = `${visibleTracks.length} קטעים • משך כולל ${formatTime(totalSeconds)}`;
+
+            if (state.currentView === 'all') {
+                titleEl.textContent = 'כל השירים';
+                badgeEl.textContent = 'ספרייה ראשית';
+                actionsEl.classList.add('hidden');
+                actionsEl.classList.remove('flex');
+            } else if (state.currentView === 'favorites') {
+                titleEl.textContent = 'מועדפים';
+                badgeEl.textContent = 'בחירות אישיות';
+                actionsEl.classList.add('hidden');
+                actionsEl.classList.remove('flex');
+            } else {
+                const pl = state.playlists.find(p => p.id === state.currentView);
+                titleEl.textContent = pl ? pl.name : 'רשימת השמעה';
+                badgeEl.textContent = 'רשימת השמעה מותאמת';
+                actionsEl.classList.remove('hidden');
+                actionsEl.classList.add('flex');
+            }
+        }
+
+        function renderTrackList() {
+            const visibleTracks = applySort(getVisibleTracks());
+            renderHeaderBanner(visibleTracks);
+            updateSortUI();
+            updateMissingFilesNotice();
+
+            const container = document.getElementById('tracksContainer');
+            container.innerHTML = '';
+
+            if (visibleTracks.length === 0) {
+                container.innerHTML = `
+                    <div class="py-16 px-4 text-center">
+                        <div class="w-14 h-14 rounded-2xl bg-white/5 mx-auto flex items-center justify-center text-slate-400 mb-3">
+                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                        </div>
+                        <p class="text-slate-300 font-medium">לא נמצאו ניגונים בתצוגה זו</p>
+                        <p class="text-xs text-slate-500 mt-1">ניתן לגרור קבצי שמע לכאן או להעלות דרך הכפתור בתפריט</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const isCustomPlaylist = state.currentView !== 'all' && state.currentView !== 'favorites';
+            const isSearching = document.getElementById('searchInput').value.trim().length > 0;
+
+            visibleTracks.forEach((track, idx) => {
+                const isCurrent = state.currentTrackId === track.id;
+                const isMissing = !track.url;
+                const row = document.createElement('div');
+                row.onclick = () => playTrack(track.id);
+                row.className = `group grid grid-cols-12 gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 items-center cursor-pointer transition-colors ${isCurrent ? 'bg-sky-500/10' : 'hover:bg-white/[0.04]'}`;
+
+                // אינדיקטור ניגון / מספר שורה
+                const indexCell = isCurrent && state.isPlaying
+                    ? `<div class="flex items-end justify-center gap-0.5 h-4">
+                           <span class="w-1 bg-sky-400 animate-pulse h-3 rounded-full"></span>
+                           <span class="w-1 bg-sky-400 animate-bounce h-4 rounded-full"></span>
+                           <span class="w-1 bg-sky-400 animate-pulse h-2 rounded-full"></span>
+                       </div>`
+                    : `<span class="text-xs font-mono ${isCurrent ? 'text-sky-400 font-bold' : 'text-slate-500 group-hover:text-slate-300'}">${idx + 1}</span>`;
+
+                // כפתורי שינוי סדר בתוך רשימת השמעה
+                const reorderControls = (isCustomPlaylist && !isSearching) ? `
+                    <button onclick="moveTrackInPlaylist(${idx}, -1, event)" ${idx === 0 ? 'disabled' : ''} title="הזז למעלה" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-25">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                    </button>
+                    <button onclick="moveTrackInPlaylist(${idx}, 1, event)" ${idx === visibleTracks.length - 1 ? 'disabled' : ''} title="הזז למטה" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-25">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                ` : '';
+
+                const removeAction = isCustomPlaylist
+                    ? `<button onclick="removeFromCurrentPlaylist('${track.id}', event)" title="הסר מרשימה זו" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10">
+                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                       </button>`
+                    : `<button onclick="deleteTrackFromLibrary('${track.id}', event)" title="מחק מהספרייה" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                       </button>`;
+
+                row.innerHTML = `
+                    <div class="col-span-1 text-center">${indexCell}</div>
+                    
+                    <div class="col-span-7 sm:col-span-4 min-w-0">
+                        <div class="text-sm font-semibold truncate ${isCurrent ? 'text-sky-400' : 'text-white'}">
+                            ${escapeHtml(track.title)}
+                            ${isMissing ? `<span class="text-[10px] font-normal px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 align-middle">קובץ חסר</span>` : ''}
+                        </div>
+                        <div class="text-xs text-slate-400 truncate sm:hidden mt-0.5">${escapeHtml(track.artist)}</div>
+                    </div>
+
+                    <div class="hidden sm:block sm:col-span-3 text-xs text-slate-400 truncate">${escapeHtml(track.artist)}</div>
+
+                    <div class="hidden sm:block sm:col-span-1 text-center text-xs font-mono text-slate-400">${formatTime(track.duration)}</div>
+
+                    <div class="col-span-4 sm:col-span-2 flex items-center justify-end gap-1">
+                        ${reorderControls}
+                        <button onclick="openTrackEditModal('${track.id}', event)" title="שינוי שם" class="p-1.5 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-white/10 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </button>
+                        <button onclick="toggleFavorite('${track.id}', event)" title="מועדפים" class="p-1.5 rounded-lg hover:bg-white/10 transition-colors ${track.isFavorite ? 'text-amber-400' : 'text-slate-500 hover:text-amber-400'}">
+                            <svg class="w-4 h-4 ${track.isFavorite ? 'fill-amber-400' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                            </svg>
+                        </button>
+                        <button onclick="openAddToPlaylistModal('${track.id}', event)" title="הוסף לרשימת השמעה" class="p-1.5 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-white/10 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                        </button>
+                        ${removeAction}
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function renderAll() {
+            renderSidebar();
+            renderTrackList();
+            updateStorageInfo();
+            updatePlayerUI();
+        }
+
+        /**
+         * תפריט צד במובייל וקיצורי מקלדת
+         */
+        function toggleSidebar(open) {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('mobileBackdrop');
+            if (open) {
+                sidebar.classList.remove('translate-x-full');
+                backdrop.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('translate-x-full');
+                backdrop.classList.add('hidden');
+            }
+        }
+
+        // תמיכה במקש Enter במודאל יצירת רשימה
+        document.getElementById('playlistNameInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') savePlaylistModal();
+            if (e.key === 'Escape') closePlaylistModal();
+        });
+
+        // תמיכה במקש Enter / Escape במודאל עריכת שם הרצועה
+        ['trackTitleInput', 'trackArtistInput'].forEach(inputId => {
+            document.getElementById(inputId).addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); saveTrackEdit(); }
+                if (e.key === 'Escape') { e.preventDefault(); closeTrackEditModal(); }
+            });
+        });
+
+        // קיצורי מקלדת גלובליים
+        window.addEventListener('keydown', (e) => {
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+            if (e.key === 'Escape' && document.getElementById('searchInput').value) {
+                clearSearch();
+                return;
+            }
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePlayPause();
+            } else if (e.code === 'ArrowLeft') {
+                // ב-RTL שמאלה מקדם קדימה בזמן
+                if (audio.duration) audio.currentTime = Math.min(audio.duration, audio.currentTime + 5);
+            } else if (e.code === 'ArrowRight') {
+                if (audio.duration) audio.currentTime = Math.max(0, audio.currentTime - 5);
+            } else if (e.key === 'm' || e.key === 'M' || e.key === 'צ') {
+                toggleMute();
+            }
+        });
+
+        // סגירת תפריט טיימר בלחיצה מחוץ לאזור
+        window.addEventListener('click', (e) => {
+            const sleepBtn = document.getElementById('sleepTimerBtn');
+            const sleepMenu = document.getElementById('sleepMenu');
+            if (sleepBtn && sleepMenu && !sleepBtn.contains(e.target) && !sleepMenu.contains(e.target)) {
+                sleepMenu.classList.add('hidden');
+            }
+        });
+
+        // אתחול היישום בטעינה
+        window.addEventListener('DOMContentLoaded', async () => {
+            // טעינת נתונים שמורים; אם אין - אתחול רצועות דמו
+            const restored = loadState();
+            if (!restored) {
+                // אין נתונים שמורים (או שהם פגומים) - ספריית דמו התחלתית
+                initDemoTracks();
+                audio.volume = 0.85;
+            }
+
+            applyRepeatUI();
+            applySpeedUI();
+            updateVolumeIcons();
+            updateSearchUI();
+            updateShuffleUI();
+            renderAll();
+            drawVisualizer();
+
+            // שחזור קובצי השמע שנשמרו - ללא צורך בהעלאה מחדש
+            const filesRestored = await restoreSavedAudio();
+            if (filesRestored > 0) {
+                if (!state.sortKey) renderAll();
+                updateStorageInfo();
+                showToast(`${filesRestored} קבצי שמע שוחזרו מהאחסון`);
+            }
+            cleanupOrphanAudio();
+        });
+    </script>
+</body>
+</html>
